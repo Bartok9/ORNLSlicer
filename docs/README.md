@@ -15,6 +15,7 @@ This directory is the canonical documentation source for ORNLSlicer.
 
 ## Contributor Docs
 
+- [Architecture Map](../ARCHITECTURE.md)
 - [Conventional Branch Naming](contributing/conventional-branch.md)
 - [Conventional Commits](contributing/conventional-commits.md)
 - [Pull Requests](contributing/pull-requests.md)
