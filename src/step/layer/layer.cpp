@@ -333,6 +333,9 @@ void Layer::calculateModifiers(Point& currentLocation) {
             currentLocation = getIslands().last()->getRegions().last()->getPaths().last().back()->end();
         }
     }
+
+    for (QSharedPointer<IslandBase> island : getIslands())
+        island->fitCircularArcs(this->getSb());
 }
 
 void Layer::setSb(const QSharedPointer<SettingsBase>& sb) {

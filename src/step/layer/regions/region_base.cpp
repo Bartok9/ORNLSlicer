@@ -1,6 +1,7 @@
 #include "step/layer/regions/region_base.h"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include <qcontainerfwd.h>
@@ -20,6 +21,24 @@
 #include "utilities/constants.h"
 
 namespace ORNL {
+namespace {
+bool planarArcFittingAllowed(const QSharedPointer<SettingsBase>& global_sb) {
+    if (global_sb == nullptr)
+        return false;
+
+    if (!global_sb->setting<bool>(PRS::MachineSetup::kSupportG3))
+        return false;
+
+    if (static_cast<SlicerType>(global_sb->setting<int>(PS::Slicing::kSlicerType)) != SlicerType::kPlanarSlice)
+        return false;
+
+    constexpr double kVectorTolerance = 1.0e-6;
+    return std::abs(global_sb->setting<float>(PS::Slicing::kSlicingVectorX)) <= kVectorTolerance &&
+           std::abs(global_sb->setting<float>(PS::Slicing::kSlicingVectorY)) <= kVectorTolerance &&
+           std::abs(global_sb->setting<float>(PS::Slicing::kSlicingVectorZ) - 1.0f) <= kVectorTolerance;
+}
+} // namespace
+
 RegionBase::RegionBase(const QSharedPointer<SettingsBase>& sb, const int index,
                        const QVector<SettingsPolygon>& settings_polygons, PolygonList uncut_geometry)
     : m_sb(sb), m_index(index), m_settings_polygons(settings_polygons), m_uncut_geometry(uncut_geometry) {
@@ -124,6 +143,14 @@ void RegionBase::calculateMultiMaterialTransition(Distance& transition_distance,
         if (transition_distance <= 0)
             break;
     }
+}
+
+void RegionBase::fitCircularArcs(const QSharedPointer<SettingsBase>& global_sb) {
+    if (!planarArcFittingAllowed(global_sb))
+        return;
+
+    for (Path& path : m_paths)
+        path.fitCircularArcs(m_sb);
 }
 
 void RegionBase::setLastSpiral(bool spiral) { m_was_last_region_spiral = spiral; }
