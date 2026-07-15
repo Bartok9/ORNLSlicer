@@ -51,6 +51,23 @@
 namespace ORNL {
 namespace {
 constexpr float kMinimumLayerSettingsRangeThickness = 0.01f;
+
+QVector3D slicingVector(const QSharedPointer<SettingsBase>& sb) {
+    QVector3D vector = {sb->setting<float>(PS::Slicing::kSlicingVectorX),
+                        sb->setting<float>(PS::Slicing::kSlicingVectorY),
+                        sb->setting<float>(PS::Slicing::kSlicingVectorZ)};
+
+    if (vector.isNull()) {
+        return QVector3D(0.0f, 0.0f, 1.0f);
+    }
+
+    vector.normalize();
+    return vector;
+}
+
+QQuaternion slicingPlaneRotation(const QSharedPointer<SettingsBase>& sb) {
+    return MathUtils::CreateQuaternion(QVector3D(0, 0, 1), slicingVector(sb));
+}
 } // namespace
 
 PartView::PartView(QSharedPointer<SettingsBase> sb) {
@@ -107,6 +124,10 @@ void PartView::showLabels(bool show) {
 }
 
 void PartView::showSlicingPlanes(bool show) {
+    if (show) {
+        updateSlicingSettings(m_sb);
+    }
+
     for (auto& gop : m_part_objects) {
         gop->plane()->setHidden(!show);
     }
@@ -428,13 +449,7 @@ void PartView::updateOverhangSettings(QSharedPointer<SettingsBase> sb) {
 void PartView::updateSlicingSettings(QSharedPointer<SettingsBase> sb) {
     m_sb = sb;
 
-    // Determine the slicing plane normal
-    QVector3D slicing_vector = {m_sb->setting<float>(PS::Slicing::kSlicingVectorX),
-                                m_sb->setting<float>(PS::Slicing::kSlicingVectorY),
-                                m_sb->setting<float>(PS::Slicing::kSlicingVectorZ)};
-    slicing_vector.normalize();
-
-    QQuaternion rotation = MathUtils::CreateQuaternion(QVector3D(0, 0, 1), slicing_vector);
+    QQuaternion rotation = slicingPlaneRotation(m_sb);
 
     for (auto& gop : m_part_objects) {
         gop->plane()->setLockedRotationQuaternion(rotation);
@@ -921,6 +936,7 @@ void PartView::modelAdditionUpdate(QSharedPointer<PartMetaItem> pm) {
 
     // Sub object visibility.
     gop->setOverhangAngle(m_sb->setting<Angle>(PS::Support::kThresholdAngle));
+    gop->plane()->setLockedRotationQuaternion(slicingPlaneRotation(m_sb));
     if (m_state.overhangs_shown)
         gop->showOverhang(true);
     if (m_state.planes_shown)
@@ -1220,14 +1236,7 @@ void PartView::updateLayerSettingsRangePlane() {
         return;
     }
 
-    QVector3D slicing_vector = {m_sb->setting<float>(PS::Slicing::kSlicingVectorX),
-                                m_sb->setting<float>(PS::Slicing::kSlicingVectorY),
-                                m_sb->setting<float>(PS::Slicing::kSlicingVectorZ)};
-    if (slicing_vector.isNull()) {
-        this->update();
-        return;
-    }
-    slicing_vector.normalize();
+    const QQuaternion rotation = slicingPlaneRotation(m_sb);
 
     float length = gop->maximum().x() - gop->minimum().x();
     float width = gop->maximum().y() - gop->minimum().y();
@@ -1244,7 +1253,7 @@ void PartView::updateLayerSettingsRangePlane() {
 
         QSharedPointer<PlaneObject> range_plane = gop->layerSettingsRangePlane(visible_plane_index);
         range_plane->updateDimensions(max_dim, max_dim, thickness);
-        range_plane->setLockedRotationQuaternion(MathUtils::CreateQuaternion(QVector3D(0, 0, 1), slicing_vector));
+        range_plane->setLockedRotationQuaternion(rotation);
         range_plane->translateAbsolute(center);
         range_plane->show();
 
